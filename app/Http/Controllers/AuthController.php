@@ -8,57 +8,111 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Symfony\Component\HttpFoundation\Response;
+use App\Http\Controllers\Controller;
+
+use JWTAuth;
+use Validator;
 
 class AuthController extends Controller
 {
-    public function signUp(Request $request){
+       public function __construct()
+    {
+        $this->middleware('auth:api', ['except' => ['login','register']]);
+    }
+
+    public function register(Request $request)
+    {
+        
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+  
         $user = User::create([
             'name' => $request->input('name'),
             'email' => $request->input('email'),
-            'password' => Hash::make($request->input('password')),
-            
+            'password' => bcrypt($request->input('password')),
         ]);
-        $token = $user->createToken('authToken')->plainTextToken;
+
+        
+        $token = JWTAuth::fromUser($user);
 
         
         return response()->json([
             'email' => $user->email,
             'token' => $token,
-        ], 201); //201 - created
-        
-            
+        ], 201);
     }
+   
+        public function login()
+    {
+        $credentials = request(['email', 'password']);
 
-    public function signIn(Request $request){
-        
-        
-         if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'message' => 'Invalid credentials'
-            ], 401); // 401 - Unauthorized
-        }
-
-        $user = Auth::user();
-       
-        $token = $user->tokens->first();
-
-        return response()->json([
-            'email' => $user->email,
-            'token' => $token,
-        ], 200); // 200 - OK
-    }
-
-    public function logout(Request $request){
-        $cookie = Cookie::forget('jwt');
-
-        
-
-        return response([
-            'message' => 'Success'
-        ])->withCookie($cookie);
-    }
     
-    public function user(){
-        return Auth::user();
+     if (! $token = auth()->attempt($credentials)) {
+        
+          return response()->json(['error' => 'Unauthorized'], 401);
+     }
+
+    
+     return response()->json([
+          'email' => auth()->user()->email, 
+          'token' => $token, 
+     ]);
+    }
+
+
+    /**
+     * Get the authenticated User.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function me()
+    {
+        return response()->json(auth()->user());
+    }
+
+    /**
+     * Log the user out (Invalidate the token).
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout()
+    {
+        auth()->logout();
+
+        return response()->json(['message' => 'Successfully logged out']);
+    }
+
+    /**
+     * Refresh a token.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function refresh()
+    {
+        return $this->respondWithToken(auth()->refresh());
+    }
+
+    /**
+     * Get the token array structure.
+     *
+     * @param  string $token
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function respondWithToken($token)
+    {
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => auth()->factory()->getTTL() * 60
+        ]);
     }
 }

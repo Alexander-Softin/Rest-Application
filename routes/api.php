@@ -19,15 +19,36 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function () {
     Route::get('user',[AuthController::class,'user']);;
 });
-
 Route::middleware('auth:sanctum')->get('getCarsInfo',[CarController::class,'getCarsInfo']);
+Route::group([
 
-Route::post('signUp',[AuthController::class,'signUp']);
-Route::post('signIn',[AuthController::class,'signIn']);
-Route::post('logout',[AuthController::class,'logout']);
+    'middleware' => 'api',
+    'prefix' => 'auth'
 
-Route::get('getCarInfo',[CarController::class,'getCarInfo']);
+], function ($router) {
+
+    Route::post('signUp',[AuthController::class,'register']);
+    Route::post('signIn',[AuthController::class,'login']);
+    
+    
+
+    
+    Route::post('logout', 'AuthController@logout');
+    Route::post('refresh', 'AuthController@refresh');
+    Route::post('me', 'AuthController@me');
+
+});
+
+Route::group(['namespace' => 'Cars', 'middleware' => 'jwt.auth'], function(){
+    Route::get('getCarsInfo',[CarController::class,'getCarsInfo']);
+    Route::get('getCarInfo',[CarController::class,'getCarInfo']);
+});
 
 
 
-Route::get('getCarInfo',[CarController::class,'getCarInfo']);
+
+
+
+
+
+
